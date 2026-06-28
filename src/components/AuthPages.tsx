@@ -12,7 +12,7 @@ import {
   AlertCircle, 
   Sparkles
 } from 'lucide-react';
-import { hashPassword } from '../utils/crypto';
+import { hashPassword, verifyPassword } from '../utils/crypto';
 import { UserAccount } from '../types';
 
 interface AuthPagesProps {
@@ -57,6 +57,46 @@ export default function AuthPages({
     return /\S+@\S+\.\S+/.test(emailStr);
   };
 
+  // Failed Attempts Tracker (Brute Force protection)
+  const checkFailedAttempts = (emailStr: string): boolean => {
+    const attemptsKey = `tadka_failed_attempts_${emailStr.toLowerCase()}`;
+    const lockoutKey = `tadka_lockout_until_${emailStr.toLowerCase()}`;
+    
+    const now = Date.now();
+    const lockoutUntil = Number(localStorage.getItem(lockoutKey) || '0');
+    
+    if (lockoutUntil > now) {
+      const remainingSecs = Math.ceil((lockoutUntil - now) / 1000);
+      setErrorMsg(`Too many failed login attempts. Please try again in ${remainingSecs} seconds.`);
+      return false;
+    }
+    return true;
+  };
+
+  const registerFailedAttempt = (emailStr: string) => {
+    const attemptsKey = `tadka_failed_attempts_${emailStr.toLowerCase()}`;
+    const lockoutKey = `tadka_lockout_until_${emailStr.toLowerCase()}`;
+    
+    const currentAttempts = Number(localStorage.getItem(attemptsKey) || '0') + 1;
+    localStorage.setItem(attemptsKey, String(currentAttempts));
+    
+    if (currentAttempts >= 5) {
+      const lockoutUntil = Date.now() + 60 * 1000; // 60 seconds lockout
+      localStorage.setItem(lockoutKey, String(lockoutUntil));
+      localStorage.setItem(attemptsKey, '0'); // reset count
+      setErrorMsg('Too many failed login attempts. This account is locked for 60 seconds.');
+    } else {
+      setErrorMsg('Invalid email or password.');
+    }
+  };
+
+  const clearFailedAttempts = (emailStr: string) => {
+    const attemptsKey = `tadka_failed_attempts_${emailStr.toLowerCase()}`;
+    const lockoutKey = `tadka_lockout_until_${emailStr.toLowerCase()}`;
+    localStorage.removeItem(attemptsKey);
+    localStorage.removeItem(lockoutKey);
+  };
+
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
@@ -67,25 +107,34 @@ export default function AuthPages({
       return;
     }
 
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!checkFailedAttempts(cleanEmail)) {
+      return;
+    }
+
     setLoading(true);
 
     // Simulate database delay
     setTimeout(async () => {
       try {
-        const foundUser = users.find(u => u.email.toLowerCase() === email.trim().toLowerCase());
+        const foundUser = users.find(u => u.email.toLowerCase() === cleanEmail);
         
         if (!foundUser) {
-          setErrorMsg('This email ID is not registered with Tadka Club.');
+          setErrorMsg('Account not found. Please create an account.');
           setLoading(false);
           return;
         }
 
-        const hashed = await hashPassword(password);
-        if (foundUser.passwordHash !== hashed) {
-          setErrorMsg('Incorrect Password. Please check your credentials and try again.');
+        const isMatch = await verifyPassword(password, foundUser.passwordHash);
+        if (!isMatch) {
+          registerFailedAttempt(cleanEmail);
           setLoading(false);
           return;
         }
+
+        // Success!
+        clearFailedAttempts(cleanEmail);
 
         // Remember Me cookie/storage logic
         if (rememberMe) {
@@ -246,67 +295,93 @@ export default function AuthPages({
     }, 1000);
   };
 
-  // Register listener for Google Auth popup messages
+  // Initialize and render Google Identity Services button
   React.useEffect(() => {
-    const handleAuthMessage = (event: MessageEvent) => {
-      if (event.data && event.data.type === 'GOOGLE_SIGNIN_SUCCESS') {
-        const { email: googleEmail, name: googleName } = event.data;
-        
-        setLoading(true);
-        setErrorMsg('');
-        setSuccessMsg(`Google Authentication successful! Welcome, ${googleName}.`);
+    let intervalId: any;
+    
+    const initGIS = () => {
+      if (typeof window !== 'undefined' && (window as any).google) {
+        clearInterval(intervalId);
+        const google = (window as any).google;
+        try {
+          google.accounts.id.initialize({
+            client_id: (import.meta as any).env?.VITE_GOOGLE_CLIENT_ID || '964858546555-5v88lkrg42a5skncl019vep1p7s2eunp.apps.googleusercontent.com',
+            callback: (response: any) => {
+              if (response.credential) {
+                try {
+                  // Decode JWT safely supporting UTF-8 names
+                  const base64Url = response.credential.split('.')[1];
+                  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                  const jsonPayload = decodeURIComponent(atob(base64).split('').map((c) => {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                  }).join(''));
+                  
+                  const payload = JSON.parse(jsonPayload);
+                  const googleEmail = payload.email;
+                  const googleName = payload.name;
+                  
+                  if (googleEmail) {
+                    setLoading(true);
+                    setErrorMsg('');
+                    setSuccessMsg(`Google Authentication successful! Welcome, ${googleName || googleEmail}.`);
 
-        // Check if user already exists
-        const existing = users.find(u => u.email.toLowerCase() === googleEmail.toLowerCase());
-        
-        setTimeout(() => {
-          if (existing) {
-            onLoginSuccess(existing.email, existing.name, existing.tier, existing.points);
-          } else {
-            // Auto register the Google account
-            const newUser: UserAccount = {
-              id: `user-${Date.now()}`,
-              name: googleName || googleEmail.split('@')[0],
-              email: googleEmail.toLowerCase(),
-              passwordHash: 'GOOGLE_AUTHENTICATED_NOPASS',
-              role: 'User',
-              tier: 'Free',
-              points: 150, // Google Sign-In bonus!
-              registeredAt: new Date().toISOString()
-            };
-            onAddUser(newUser);
-            onLoginSuccess(newUser.email, newUser.name, newUser.tier, newUser.points);
+                    const existing = users.find(u => u.email.toLowerCase() === googleEmail.toLowerCase());
+                    
+                    setTimeout(() => {
+                      if (existing) {
+                        onLoginSuccess(existing.email, existing.name, existing.tier, existing.points);
+                      } else {
+                        // Auto register the Google account
+                        const newUser: UserAccount = {
+                          id: `google-${payload.sub || Date.now()}`,
+                          name: googleName || googleEmail.split('@')[0],
+                          email: googleEmail.toLowerCase(),
+                          passwordHash: 'GOOGLE_AUTHENTICATED_NOPASS',
+                          role: 'User',
+                          tier: 'Free',
+                          points: 150, // Google Sign-In bonus!
+                          registeredAt: new Date().toISOString()
+                        };
+                        onAddUser(newUser);
+                        onLoginSuccess(newUser.email, newUser.name, newUser.tier, newUser.points);
+                      }
+                      setLoading(false);
+                    }, 1200);
+                  }
+                } catch (e) {
+                  console.error("Failed to decode JWT:", e);
+                  setErrorMsg('Failed to process Google account credentials.');
+                }
+              }
+            },
+            auto_select: false,
+            cancel_on_tap_outside: true
+          });
+
+          const btnContainer = document.getElementById('google-signin-btn-container');
+          if (btnContainer) {
+            google.accounts.id.renderButton(btnContainer, {
+              theme: 'outline',
+              size: 'large',
+              width: '320', // Explicit width to fit perfectly in login cards
+              text: 'continue_with',
+              shape: 'rectangular',
+              logo_alignment: 'left'
+            });
           }
-          setLoading(false);
-        }, 1200);
-      } else if (event.data && event.data.type === 'GOOGLE_SIGNIN_CANCELLED') {
-        // User closed or cancelled the popup. No error should appear.
-        setErrorMsg('');
-        setLoading(false);
+        } catch (err) {
+          console.error("GIS initialization error:", err);
+        }
       }
     };
 
-    window.addEventListener('message', handleAuthMessage);
-    return () => {
-      window.removeEventListener('message', handleAuthMessage);
-    };
-  }, [users, onLoginSuccess, onAddUser]);
+    initGIS();
+    intervalId = setInterval(initGIS, 500);
 
-  const handleGoogleSignInClick = () => {
-    setErrorMsg('');
-    setSuccessMsg('');
-    
-    const width = 500;
-    const height = 650;
-    const left = window.screen.width / 2 - width / 2;
-    const top = window.screen.height / 2 - height / 2;
-    
-    window.open(
-      '/google-auth-popup.html',
-      'GoogleSignInPopup',
-      `width=${width},height=${height},top=${top},left=${left},resizable=yes,scrollbars=yes,status=yes`
-    );
-  };
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [users, onLoginSuccess, onAddUser, view]);
 
   return (
     <div className="mx-auto max-w-lg px-4 py-12 sm:px-6 lg:py-16" id="auth-portal-page">
@@ -438,19 +513,10 @@ export default function AuthPages({
               <span className="relative bg-white px-4 text-[10px] font-bold text-neutral-400 uppercase tracking-widest dark:bg-neutral-950">Or sign in with</span>
             </div>
 
-            <button
-              type="button"
-              onClick={handleGoogleSignInClick}
-              className="w-full flex items-center justify-center gap-2 rounded-xl border border-neutral-200 bg-white py-2.5 text-xs font-bold text-neutral-700 hover:bg-neutral-50 dark:border-neutral-850 dark:bg-neutral-950 dark:text-neutral-300 dark:hover:bg-neutral-900/40 transition shadow-xs cursor-pointer"
-            >
-              <svg className="h-4 w-4" viewBox="0 0 24 24" width="24" height="24">
-                <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.47 15 0 12 0 7.35 0 3.39 2.67 1.47 6.56l3.84 2.98C6.24 6.7 8.93 5.04 12 5.04z" />
-                <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.47h6.44c-.28 1.47-1.11 2.71-2.36 3.56l3.66 2.84c2.14-1.98 3.39-4.89 3.39-8.51z" />
-                <path fill="#FBBC05" d="M5.31 14.54c-.24-.72-.38-1.5-.38-2.3s.14-1.58.38-2.3L1.47 6.56C.53 8.46 0 10.58 0 12s.53 3.54 1.47 5.44l3.84-2.9z" />
-                <path fill="#34A853" d="M12 24c3.24 0 5.97-1.08 7.96-2.91l-3.66-2.84c-1.01.68-2.31 1.09-4.3 1.09-3.07 0-5.76-1.66-6.69-4.5H1.47v2.98C3.39 21.33 7.35 24 12 24z" />
-              </svg>
-              <span>Continue with Google</span>
-            </button>
+            <div 
+              id="google-signin-btn-container" 
+              className="w-full flex justify-center py-1 overflow-hidden"
+            ></div>
 
             <div className="text-center mt-6 pt-6 border-t border-neutral-100 dark:border-neutral-900 text-xs text-neutral-400">
               New to the club?{' '}

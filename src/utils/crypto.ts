@@ -3,18 +3,40 @@
  * Utilizes the standard, native Web Crypto API for secure SHA-256 password hashing.
  */
 
+import bcrypt from 'bcryptjs';
+
 /**
- * Hashes a plaintext password securely using SHA-256.
- * Returns a 64-character hexadecimal representation of the hash.
+ * Hashes a plaintext password securely using bcrypt.
  */
 export async function hashPassword(password: string): Promise<string> {
   if (!password) return '';
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password);
-  const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  return hashHex;
+  const salt = await bcrypt.genSalt(10);
+  const hash = await bcrypt.hash(password, salt);
+  return hash;
+}
+
+/**
+ * Verifies a plaintext password against a hash (either bcrypt or legacy SHA-256).
+ */
+export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  if (!password || !hash) return false;
+  
+  // If the hash is a legacy SHA-256 hash (64 hex characters)
+  if (hash.length === 64 && !hash.startsWith('$2')) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password);
+    const hashBuffer = await window.crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashHex === hash;
+  }
+  
+  // Otherwise verify with bcrypt
+  try {
+    return await bcrypt.compare(password, hash);
+  } catch (err) {
+    return false;
+  }
 }
 
 /**

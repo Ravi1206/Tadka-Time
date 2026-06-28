@@ -25,6 +25,7 @@ import {
   Users
 } from 'lucide-react';
 import { Article, Category, Comment, AdSetting, Quiz, UserAccount } from '../types';
+import { verifyPassword } from '../utils/crypto';
 
 interface AdminPanelProps {
   articles: Article[];
@@ -121,24 +122,34 @@ export default function AdminPanel({
   const [unlockPassword, setUnlockPassword] = useState('');
   const [unlockError, setUnlockError] = useState('');
 
-  const handleLocalUnlockSubmit = (e: React.FormEvent) => {
+  const handleLocalUnlockSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!unlockEmail.trim() || !unlockPassword.trim()) {
       setUnlockError('Please enter both Email and Password.');
       return;
     }
     const cleanEmail = unlockEmail.trim().toLowerCase();
-    const isAdminEmail = cleanEmail === 'ravikumar870317@gmail.com' || cleanEmail === 'admin@tadkaclub.com' || cleanEmail.includes('admin');
+    const foundUser = users.find(u => u.email.toLowerCase() === cleanEmail);
     
-    if (isAdminEmail) {
-      const parts = cleanEmail.split('@')[0];
-      const beautifulName = parts.charAt(0).toUpperCase() + parts.slice(1);
-      onAdminUnlock(cleanEmail, beautifulName);
-      setUnlockError('');
-      alert(`Welcome Chief Admin, ${beautifulName}! You now have permission to change portal news, articles and quizzes.`);
-    } else {
-      setUnlockError('Access Denied. That email is not on the authorized Administrator list.');
+    if (!foundUser) {
+      setUnlockError('Account not found. That email is not registered.');
+      return;
     }
+
+    if (foundUser.role !== 'Admin') {
+      setUnlockError('Access Denied. You do not have Administrator permissions.');
+      return;
+    }
+
+    const isMatch = await verifyPassword(unlockPassword, foundUser.passwordHash);
+    if (!isMatch) {
+      setUnlockError('Invalid email or password.');
+      return;
+    }
+    
+    onAdminUnlock(cleanEmail, foundUser.name);
+    setUnlockError('');
+    alert(`Welcome Chief Admin, ${foundUser.name}! You now have permission to change portal news, articles and quizzes.`);
   };
 
   // --- Publish Type toggle (article vs quiz)
