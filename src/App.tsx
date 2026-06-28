@@ -156,9 +156,18 @@ export default function App() {
   const [newsletterSuccess, setNewsletterSuccess] = useState(false);
 
   // Authenticated state (Preloaded user Ravi based on system specs!)
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
-  const [username, setUsername] = useState('Ravi Kumar');
-  const [loginEmail, setLoginEmail] = useState('ravikumar870317@gmail.com');
+  const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
+    const saved = localStorage.getItem('tadka_is_logged_in');
+    return saved !== null ? saved === 'true' : true;
+  });
+  const [username, setUsername] = useState<string>(() => {
+    const saved = localStorage.getItem('tadka_username');
+    return saved !== null ? saved : 'Ravi Kumar';
+  });
+  const [loginEmail, setLoginEmail] = useState<string>(() => {
+    const saved = localStorage.getItem('tadka_login_email');
+    return saved !== null ? saved : 'ravikumar870317@gmail.com';
+  });
   const [loginPassword, setLoginPassword] = useState('');
 
   const isAdmin = isLoggedIn && (
@@ -168,6 +177,18 @@ export default function App() {
   );
 
   // Save states to localStorage upon changes
+  useEffect(() => {
+    localStorage.setItem('tadka_is_logged_in', String(isLoggedIn));
+  }, [isLoggedIn]);
+
+  useEffect(() => {
+    localStorage.setItem('tadka_username', username);
+  }, [username]);
+
+  useEffect(() => {
+    localStorage.setItem('tadka_login_email', loginEmail);
+  }, [loginEmail]);
+
   useEffect(() => {
     localStorage.setItem('tadka_dark_mode', String(darkMode));
     if (darkMode) {
@@ -240,18 +261,32 @@ export default function App() {
       alert('Please fill out all credentials.');
       return;
     }
-    const extractedUser = loginEmail.split('@')[0];
-    const beautifulName = extractedUser.charAt(0).toUpperCase() + extractedUser.slice(1);
-    setUsername(beautifulName);
-    setIsLoggedIn(true);
-    setShowLoginModal(false);
-    alert(`Welcome back to Tadka Club, ${beautifulName}!`);
+    const existingUser = users.find(u => u.email.toLowerCase() === loginEmail.toLowerCase());
+    if (existingUser) {
+      setUsername(existingUser.name);
+      setUserTier(existingUser.tier);
+      setUserPoints(existingUser.points);
+      setIsLoggedIn(true);
+      setShowLoginModal(false);
+      alert(`Welcome back to Tadka Club, ${existingUser.name}!`);
+    } else {
+      const extractedUser = loginEmail.split('@')[0];
+      const beautifulName = extractedUser.charAt(0).toUpperCase() + extractedUser.slice(1);
+      setUsername(beautifulName);
+      setUserTier('Free');
+      setUserPoints(100);
+      setIsLoggedIn(true);
+      setShowLoginModal(false);
+      alert(`Welcome back to Tadka Club, ${beautifulName}!`);
+    }
   };
 
   const handleLogout = () => {
     setIsLoggedIn(false);
     setUsername('');
     setUserTier('Free');
+    setActiveCategory('all');
+    setActiveArticle(null);
     alert('Logged out successfully.');
   };
 
