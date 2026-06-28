@@ -99,3 +99,14 @@ export interface AdSetting {
   type: 'banner' | 'sidebar' | 'in-feed';
   earnings: number;
 }
+
+export interface UserAccount {
+  id: string;
+  name: string;
+  email: string;
+  passwordHash: string; // cryptographically secure SHA-256 password hash
+  role: 'Admin' | 'User';
+  tier: 'Free' | 'Premium';
+  points: number;
+  registeredAt: string;
+}

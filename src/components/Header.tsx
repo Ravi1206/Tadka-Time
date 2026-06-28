@@ -184,11 +184,11 @@ export default function Header({
                       </div>
 
                       <button
-                        onClick={() => { setActiveCategory('bookmarks'); setShowProfileDropdown(false); }}
+                        onClick={() => { setActiveCategory('dashboard'); setShowProfileDropdown(false); }}
                         className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-900"
                       >
-                        <BookOpen className="h-4 w-4 text-neutral-400" />
-                        Bookmarked Articles
+                        <User className="h-4 w-4 text-neutral-400" />
+                        My Dashboard & saves
                       </button>
 
                       <button
@@ -266,14 +266,14 @@ export default function Header({
             {/* Shortcuts */}
             <div className="flex items-center gap-2 border-l border-neutral-200 pl-4 dark:border-neutral-800">
               <button 
-                onClick={() => setActiveCategory('bookmarks')}
+                onClick={() => setActiveCategory('dashboard')}
                 className={`text-xs font-semibold flex items-center gap-1 px-2.5 py-1.5 rounded-md transition ${
-                  activeCategory === 'bookmarks'
+                  activeCategory === 'dashboard'
                     ? 'text-orange-600 bg-orange-50 dark:bg-orange-950/20'
                     : 'text-neutral-500 hover:text-orange-600 dark:text-neutral-400'
                 }`}
               >
-                Bookmarks
+                Dashboard
               </button>
               <button 
                 onClick={() => setActiveCategory('admin')}
@@ -334,11 +334,11 @@ export default function Header({
           {/* Quick Actions */}
           <div className="grid grid-cols-2 gap-2">
             <button
-              onClick={() => { setActiveCategory('bookmarks'); setMobileMenuOpen(false); }}
+              onClick={() => { setActiveCategory('dashboard'); setMobileMenuOpen(false); }}
               className="flex items-center justify-center gap-1.5 rounded-lg border py-2 text-xs font-bold text-neutral-700 hover:bg-neutral-50 dark:border-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-900"
             >
-              <BookOpen className="h-4 w-4" />
-              <span>Bookmarks</span>
+              <User className="h-4 w-4" />
+              <span>Dashboard</span>
             </button>
             <button
               onClick={() => { setActiveCategory('admin'); setMobileMenuOpen(false); }}

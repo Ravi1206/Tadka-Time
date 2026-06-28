@@ -19,7 +19,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 
-import { Category, Article, Comment, AdSetting, Quiz } from './types';
+import { Category, Article, Comment, AdSetting, Quiz, UserAccount } from './types';
 import { 
   INITIAL_ARTICLES, 
   INITIAL_QUIZZES, 
@@ -36,6 +36,7 @@ import PuzzlesTab from './components/PuzzlesTab';
 import FinanceCalculator from './components/FinanceCalculator';
 import EcommerceTab from './components/EcommerceTab';
 import AdminPanel from './components/AdminPanel';
+import UserDashboard from './components/UserDashboard';
 import { AboutUs, ContactUs, PrivacyPolicy, TermsConditions, Disclaimer } from './components/LegalPages';
 
 export default function App() {
@@ -88,6 +89,59 @@ export default function App() {
   const [quizzes, setQuizzes] = useState<Quiz[]>(() => {
     const saved = localStorage.getItem('tadka_quizzes');
     return saved ? JSON.parse(saved) : INITIAL_QUIZZES;
+  });
+
+  const [categories, setCategories] = useState<string[]>(() => {
+    const saved = localStorage.getItem('tadka_categories');
+    return saved ? JSON.parse(saved) : ['food', 'business', 'bengaluru', 'puzzles', 'finance', 'other'];
+  });
+
+  const [tags, setTags] = useState<string[]>(() => {
+    const saved = localStorage.getItem('tadka_tags');
+    return saved ? JSON.parse(saved) : ['Sambar', 'Bengaluru', 'AdSense', 'Spices', 'Idli', 'Filter Coffee', 'Restaurant', 'Investment'];
+  });
+
+  const [users, setUsers] = useState<UserAccount[]>(() => {
+    const saved = localStorage.getItem('tadka_users');
+    if (saved) return JSON.parse(saved);
+    const initialUsers: UserAccount[] = [
+      {
+        id: 'user-1',
+        name: 'Ravi Kumar',
+        email: 'ravikumar870317@gmail.com',
+        passwordHash: '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918',
+        role: 'Admin',
+        tier: 'Premium',
+        points: 1250,
+        registeredAt: '2026-06-01T10:00:00Z'
+      },
+      {
+        id: 'user-2',
+        name: 'Amit Patel',
+        email: 'amit@tadkaclub.com',
+        passwordHash: 'f2d81a0270cd155c8112e522444391693e4933a362024b4247545b6db760e1d5',
+        role: 'User',
+        tier: 'Free',
+        points: 180,
+        registeredAt: '2026-06-15T12:30:00Z'
+      },
+      {
+        id: 'user-3',
+        name: 'Ananya Rao',
+        email: 'ananya@tadkaclub.com',
+        passwordHash: 'f2d81a0270cd155c8112e522444391693e4933a362024b4247545b6db760e1d5',
+        role: 'User',
+        tier: 'Premium',
+        points: 620,
+        registeredAt: '2026-06-20T14:45:00Z'
+      }
+    ];
+    return initialUsers;
+  });
+
+  const [readingHistory, setReadingHistory] = useState<string[]>(() => {
+    const saved = localStorage.getItem('tadka_reading_history');
+    return saved ? JSON.parse(saved) : [];
   });
 
   // UI Active Navigation states
@@ -158,6 +212,22 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('tadka_quizzes', JSON.stringify(quizzes));
   }, [quizzes]);
+
+  useEffect(() => {
+    localStorage.setItem('tadka_categories', JSON.stringify(categories));
+  }, [categories]);
+
+  useEffect(() => {
+    localStorage.setItem('tadka_tags', JSON.stringify(tags));
+  }, [tags]);
+
+  useEffect(() => {
+    localStorage.setItem('tadka_users', JSON.stringify(users));
+  }, [users]);
+
+  useEffect(() => {
+    localStorage.setItem('tadka_reading_history', JSON.stringify(readingHistory));
+  }, [readingHistory]);
 
   const handleAddQuiz = (newQuiz: Quiz) => {
     setQuizzes((prev) => [newQuiz, ...prev]);
@@ -247,9 +317,86 @@ export default function App() {
     }));
   };
 
+  const handleSelectArticle = (art: Article) => {
+    // Increase views count dynamically
+    setArticles(prev => prev.map(a => {
+      if (a.id === art.id) {
+        const updated = { ...a, views: (a.views || 0) + 1 };
+        if (activeArticle && activeArticle.id === art.id) {
+          setActiveArticle(updated);
+        }
+        return updated;
+      }
+      return a;
+    }));
+
+    // Add to history
+    setReadingHistory(prev => {
+      const filtered = prev.filter(id => id !== art.id);
+      return [art.id, ...filtered];
+    });
+
+    setActiveArticle(art);
+  };
+
   // Admin CMS handlers
   const handleAddArticle = (newArt: Article) => {
     setArticles(prev => [newArt, ...prev]);
+  };
+
+  const handleEditArticle = (updatedArt: Article) => {
+    setArticles(prev => prev.map(art => art.id === updatedArt.id ? updatedArt : art));
+  };
+
+  const handleDeleteArticle = (id: string) => {
+    setArticles(prev => prev.filter(art => art.id !== id));
+  };
+
+  const handleEditQuiz = (updatedQuiz: Quiz) => {
+    setQuizzes(prev => prev.map(q => q.id === updatedQuiz.id ? updatedQuiz : q));
+  };
+
+  const handleDeleteQuiz = (id: string) => {
+    setQuizzes(prev => prev.filter(q => q.id !== id));
+  };
+
+  const handleAddCategory = (cat: string) => {
+    if (!categories.includes(cat)) {
+      setCategories(prev => [...prev, cat]);
+    }
+  };
+
+  const handleDeleteCategory = (cat: string) => {
+    setCategories(prev => prev.filter(c => c !== cat));
+  };
+
+  const handleAddTag = (tag: string) => {
+    if (!tags.includes(tag)) {
+      setTags(prev => [...prev, tag]);
+    }
+  };
+
+  const handleDeleteTag = (tag: string) => {
+    setTags(prev => prev.filter(t => t !== tag));
+  };
+
+  const handleUpdateUser = (id: string, updates: Partial<UserAccount>) => {
+    setUsers(prev => prev.map(u => {
+      if (u.id === id) {
+        const updated = { ...u, ...updates };
+        if (updated.email === loginEmail) {
+          if (updates.tier) setUserTier(updates.tier);
+          if (updates.points !== undefined) setUserPoints(updates.points);
+          if (updates.name) setUsername(updates.name);
+        }
+        return updated;
+      }
+      return u;
+    }));
+  };
+
+  const handleDeleteUser = (id: string) => {
+    setUsers(prev => prev.filter(u => u.id !== id));
   };
 
   const handleApproveComment = (commId: string) => {
@@ -403,19 +550,63 @@ export default function App() {
                 <AdminPanel
                   articles={articles}
                   onAddArticle={handleAddArticle}
+                  onEditArticle={handleEditArticle}
+                  onDeleteArticle={handleDeleteArticle}
                   comments={comments}
                   onApproveComment={handleApproveComment}
                   onDeleteComment={handleDeleteComment}
                   adSettings={adSettings}
                   onToggleAd={handleToggleAd}
                   newsletterSubscribers={newsletterSubscribers}
+                  quizzes={quizzes}
                   onAddQuiz={handleAddQuiz}
+                  onEditQuiz={handleEditQuiz}
+                  onDeleteQuiz={handleDeleteQuiz}
                   isAdmin={isAdmin}
                   onAdminUnlock={(email, name) => {
                     setLoginEmail(email);
                     setUsername(name);
                     setIsLoggedIn(true);
                   }}
+                  categories={categories}
+                  onAddCategory={handleAddCategory}
+                  onDeleteCategory={handleDeleteCategory}
+                  tags={tags}
+                  onAddTag={handleAddTag}
+                  onDeleteTag={handleDeleteTag}
+                  users={users}
+                  onUpdateUser={handleUpdateUser}
+                  onDeleteUser={handleDeleteUser}
+                />
+              )}
+
+              {/* USER PROFILE & SAVED ARTICLES DASHBOARD TAB */}
+              {activeCategory === 'dashboard' && (
+                <UserDashboard
+                  username={username}
+                  loginEmail={loginEmail}
+                  userTier={userTier}
+                  userPoints={userPoints}
+                  bookmarks={bookmarks}
+                  likedArticleIds={likedArticleIds}
+                  readingHistory={readingHistory}
+                  articles={articles}
+                  onUpdateProfile={(updates) => {
+                    if (updates.name) setUsername(updates.name);
+                    if (updates.email) setLoginEmail(updates.email);
+                    if (updates.tier) setUserTier(updates.tier);
+                    if (updates.points !== undefined) setUserPoints(updates.points);
+                    
+                    const currentUser = users.find(u => u.email === loginEmail);
+                    if (currentUser) {
+                      handleUpdateUser(currentUser.id, updates);
+                    }
+                  }}
+                  onSelectArticle={handleSelectArticle}
+                  onToggleBookmark={(id, e) => handleToggleBookmark(id, e)}
+                  onToggleLike={handleToggleLike}
+                  onClearReadingHistory={() => setReadingHistory([])}
+                  onAddPoints={handleAddPoints}
                 />
               )}
 
@@ -452,6 +643,7 @@ export default function App() {
                activeCategory !== 'finance' && 
                activeCategory !== 'shop' && 
                activeCategory !== 'admin' && 
+               activeCategory !== 'dashboard' && 
                activeCategory !== 'about' && 
                activeCategory !== 'contact' && 
                activeCategory !== 'privacy' && 
@@ -475,7 +667,7 @@ export default function App() {
                   {activeCategory === 'all' && !searchQuery.trim() && featuredArticle && (
                     <div 
                       className="group relative mb-10 overflow-hidden rounded-3xl border border-neutral-100 bg-white shadow-md transition hover:shadow-xl dark:border-neutral-800 dark:bg-neutral-950 flex flex-col lg:flex-row cursor-pointer"
-                      onClick={() => setActiveArticle(featuredArticle)}
+                      onClick={() => handleSelectArticle(featuredArticle)}
                       id="hero-featured-block"
                     >
                       <div className="relative aspect-video lg:aspect-auto lg:w-1/2 overflow-hidden bg-neutral-100 dark:bg-neutral-900">
@@ -547,7 +739,7 @@ export default function App() {
                         <ArticleCard
                           key={art.id}
                           article={art}
-                          onSelect={setActiveArticle}
+                          onSelect={handleSelectArticle}
                           isBookmarked={bookmarks.includes(art.id)}
                           onToggleBookmark={handleToggleBookmark}
                           index={idx}
