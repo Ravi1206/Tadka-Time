@@ -1,0 +1,6 @@
+{
+  "name": "Tadka Time",
+  "description": "A modern content platform featuring Food Blogs & Recipes, Restaurant Business Tips, Bengaluru Local News, Personal Finance, and Interactive Quuzzles & Puzzles.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
