@@ -31,6 +31,7 @@ interface HeaderProps {
   username: string;
   onLogout: () => void;
   onOpenNewsletter: () => void;
+  isAdmin: boolean;
 }
 
 export default function Header({
@@ -46,7 +47,8 @@ export default function Header({
   isLoggedIn,
   username,
   onLogout,
-  onOpenNewsletter
+  onOpenNewsletter,
+  isAdmin
 }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [showProfileDropdown, setShowProfileDropdown] = useState(false);
@@ -191,10 +193,17 @@ export default function Header({
 
                       <button
                         onClick={() => { setActiveCategory('admin'); setShowProfileDropdown(false); }}
-                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-900"
+                        className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-xs text-neutral-700 hover:bg-neutral-100 dark:text-neutral-300 dark:hover:bg-neutral-900"
                       >
-                        <Settings className="h-4 w-4 text-neutral-400" />
-                        Admin Panel / CMS
+                        <div className="flex items-center gap-2">
+                          <Settings className="h-4 w-4 text-neutral-400" />
+                          <span>Admin Panel / CMS</span>
+                        </div>
+                        {isAdmin ? (
+                          <span className="text-[9px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded font-black dark:bg-emerald-950/40 dark:text-emerald-400">Chief</span>
+                        ) : (
+                          <span className="text-[9px] bg-neutral-100 text-neutral-500 px-1.5 py-0.5 rounded font-black dark:bg-neutral-900 dark:text-neutral-400">🔒 Lock</span>
+                        )}
                       </button>
 
                       <hr className="my-1 border-neutral-100 dark:border-neutral-800" />
@@ -268,13 +277,14 @@ export default function Header({
               </button>
               <button 
                 onClick={() => setActiveCategory('admin')}
-                className={`text-xs font-semibold flex items-center gap-1 px-2.5 py-1.5 rounded-md transition ${
+                className={`text-xs font-semibold flex items-center gap-1.5 px-2.5 py-1.5 rounded-md transition ${
                   activeCategory === 'admin'
                     ? 'text-orange-600 bg-orange-50 dark:bg-orange-950/20'
                     : 'text-neutral-500 hover:text-orange-600 dark:text-neutral-400'
                 }`}
               >
-                CMS Panel
+                <span>CMS Panel</span>
+                {!isAdmin && <span className="text-[9px] opacity-75">🔒</span>}
               </button>
             </div>
           </div>
@@ -336,6 +346,7 @@ export default function Header({
             >
               <Settings className="h-4 w-4" />
               <span>CMS Panel</span>
+              {!isAdmin && <span className="text-[10px]">🔒</span>}
             </button>
           </div>
 

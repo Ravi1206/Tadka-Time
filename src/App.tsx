@@ -19,7 +19,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 
-import { Category, Article, Comment, AdSetting } from './types';
+import { Category, Article, Comment, AdSetting, Quiz } from './types';
 import { 
   INITIAL_ARTICLES, 
   INITIAL_QUIZZES, 
@@ -85,6 +85,11 @@ export default function App() {
     return saved ? (saved as 'Free' | 'Premium') : 'Free';
   });
 
+  const [quizzes, setQuizzes] = useState<Quiz[]>(() => {
+    const saved = localStorage.getItem('tadka_quizzes');
+    return saved ? JSON.parse(saved) : INITIAL_QUIZZES;
+  });
+
   // UI Active Navigation states
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -101,6 +106,12 @@ export default function App() {
   const [username, setUsername] = useState('Ravi Kumar');
   const [loginEmail, setLoginEmail] = useState('ravikumar870317@gmail.com');
   const [loginPassword, setLoginPassword] = useState('');
+
+  const isAdmin = isLoggedIn && (
+    loginEmail.toLowerCase() === 'ravikumar870317@gmail.com' || 
+    loginEmail.toLowerCase() === 'admin@tadkaclub.com' ||
+    loginEmail.toLowerCase().includes('admin')
+  );
 
   // Save states to localStorage upon changes
   useEffect(() => {
@@ -143,6 +154,14 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('tadka_user_tier', userTier);
   }, [userTier]);
+
+  useEffect(() => {
+    localStorage.setItem('tadka_quizzes', JSON.stringify(quizzes));
+  }, [quizzes]);
+
+  const handleAddQuiz = (newQuiz: Quiz) => {
+    setQuizzes((prev) => [newQuiz, ...prev]);
+  };
 
   // Auth Handlers
   const handleLoginSubmit = (e: React.FormEvent) => {
@@ -329,6 +348,7 @@ export default function App() {
         username={username}
         onLogout={handleLogout}
         onOpenNewsletter={() => setShowNewsletterModal(true)}
+        isAdmin={isAdmin}
       />
 
       {/* Main Core Section */}
@@ -358,7 +378,7 @@ export default function App() {
               {/* PUZZLES & QUIZ ARENA TAB */}
               {activeCategory === 'puzzles' && (
                 <PuzzlesTab
-                  quizzes={INITIAL_QUIZZES}
+                  quizzes={quizzes}
                   userPoints={userPoints}
                   onAddPoints={handleAddPoints}
                   leaderboard={INITIAL_LEADERBOARD}
@@ -389,6 +409,13 @@ export default function App() {
                   adSettings={adSettings}
                   onToggleAd={handleToggleAd}
                   newsletterSubscribers={newsletterSubscribers}
+                  onAddQuiz={handleAddQuiz}
+                  isAdmin={isAdmin}
+                  onAdminUnlock={(email, name) => {
+                    setLoginEmail(email);
+                    setUsername(name);
+                    setIsLoggedIn(true);
+                  }}
                 />
               )}
 
