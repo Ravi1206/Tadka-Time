@@ -52,9 +52,6 @@ export default function AuthPages({
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Interactive Google Login State
-  const [showGoogleSim, setShowGoogleSim] = useState(false);
-
   // Form Validations
   const validateEmail = (emailStr: string) => {
     return /\S+@\S+\.\S+/.test(emailStr);
@@ -249,35 +246,66 @@ export default function AuthPages({
     }, 1000);
   };
 
-  const handleGoogleSimulate = () => {
-    setShowGoogleSim(true);
-  };
+  // Register listener for Google Auth popup messages
+  React.useEffect(() => {
+    const handleAuthMessage = (event: MessageEvent) => {
+      if (event.data && event.data.type === 'GOOGLE_SIGNIN_SUCCESS') {
+        const { email: googleEmail, name: googleName } = event.data;
+        
+        setLoading(true);
+        setErrorMsg('');
+        setSuccessMsg(`Google Authentication successful! Welcome, ${googleName}.`);
 
-  const selectGoogleAccountSim = (simName: string, simEmail: string) => {
-    setShowGoogleSim(false);
-    setLoading(true);
-    
-    setTimeout(() => {
-      const existing = users.find(u => u.email.toLowerCase() === simEmail.toLowerCase());
-      if (existing) {
-        onLoginSuccess(existing.email, existing.name, existing.tier, existing.points);
-      } else {
-        // Auto register
-        const newUser: UserAccount = {
-          id: `user-${Date.now()}`,
-          name: simName,
-          email: simEmail,
-          passwordHash: 'GOOGLE_AUTHENTICATED_NOPASS',
-          role: 'User',
-          tier: 'Free',
-          points: 150, // Google Sign In Bonus!
-          registeredAt: new Date().toISOString()
-        };
-        onAddUser(newUser);
-        onLoginSuccess(newUser.email, newUser.name, newUser.tier, newUser.points);
+        // Check if user already exists
+        const existing = users.find(u => u.email.toLowerCase() === googleEmail.toLowerCase());
+        
+        setTimeout(() => {
+          if (existing) {
+            onLoginSuccess(existing.email, existing.name, existing.tier, existing.points);
+          } else {
+            // Auto register the Google account
+            const newUser: UserAccount = {
+              id: `user-${Date.now()}`,
+              name: googleName || googleEmail.split('@')[0],
+              email: googleEmail.toLowerCase(),
+              passwordHash: 'GOOGLE_AUTHENTICATED_NOPASS',
+              role: 'User',
+              tier: 'Free',
+              points: 150, // Google Sign-In bonus!
+              registeredAt: new Date().toISOString()
+            };
+            onAddUser(newUser);
+            onLoginSuccess(newUser.email, newUser.name, newUser.tier, newUser.points);
+          }
+          setLoading(false);
+        }, 1200);
+      } else if (event.data && event.data.type === 'GOOGLE_SIGNIN_CANCELLED') {
+        // User closed or cancelled the popup. No error should appear.
+        setErrorMsg('');
+        setLoading(false);
       }
-      setLoading(false);
-    }, 1200);
+    };
+
+    window.addEventListener('message', handleAuthMessage);
+    return () => {
+      window.removeEventListener('message', handleAuthMessage);
+    };
+  }, [users, onLoginSuccess, onAddUser]);
+
+  const handleGoogleSignInClick = () => {
+    setErrorMsg('');
+    setSuccessMsg('');
+    
+    const width = 500;
+    const height = 650;
+    const left = window.screen.width / 2 - width / 2;
+    const top = window.screen.height / 2 - height / 2;
+    
+    window.open(
+      '/google-auth-popup.html',
+      'GoogleSignInPopup',
+      `width=${width},height=${height},top=${top},left=${left},resizable=yes,scrollbars=yes,status=yes`
+    );
   };
 
   return (
@@ -402,7 +430,7 @@ export default function AuthPages({
               )}
             </button>
 
-            {/* Google Authentication (Optional Simulator) */}
+            {/* Google Authentication */}
             <div className="relative my-6 flex items-center justify-center">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-neutral-100 dark:border-neutral-900"></div>
@@ -412,8 +440,8 @@ export default function AuthPages({
 
             <button
               type="button"
-              onClick={handleGoogleSimulate}
-              className="w-full flex items-center justify-center gap-2 rounded-xl border border-neutral-200 bg-white py-2.5 text-xs font-bold text-neutral-700 hover:bg-neutral-50 dark:border-neutral-850 dark:bg-neutral-950 dark:text-neutral-300 dark:hover:bg-neutral-900/40 transition shadow-xs"
+              onClick={handleGoogleSignInClick}
+              className="w-full flex items-center justify-center gap-2 rounded-xl border border-neutral-200 bg-white py-2.5 text-xs font-bold text-neutral-700 hover:bg-neutral-50 dark:border-neutral-850 dark:bg-neutral-950 dark:text-neutral-300 dark:hover:bg-neutral-900/40 transition shadow-xs cursor-pointer"
             >
               <svg className="h-4 w-4" viewBox="0 0 24 24" width="24" height="24">
                 <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.47 15 0 12 0 7.35 0 3.39 2.67 1.47 6.56l3.84 2.98C6.24 6.7 8.93 5.04 12 5.04z" />
@@ -423,51 +451,6 @@ export default function AuthPages({
               </svg>
               <span>Continue with Google</span>
             </button>
-
-            {/* Simulated Google Accounts Dialog */}
-            {showGoogleSim && (
-              <div className="p-4 mt-4 rounded-2xl bg-neutral-50 border dark:bg-neutral-900/50 dark:border-neutral-800 text-left relative animate-fade-in">
-                <h4 className="text-[11px] font-black text-neutral-500 uppercase tracking-wider mb-2 flex items-center gap-1">
-                  <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                  <span>Choose Google Account</span>
-                </h4>
-                <div className="space-y-2">
-                  <button
-                    type="button"
-                    onClick={() => selectGoogleAccountSim('Ravi Kumar', 'ravikumar870317@gmail.com')}
-                    className="w-full flex items-center gap-3 p-2 rounded-xl bg-white hover:bg-neutral-100 text-left border border-neutral-100 dark:bg-neutral-950 dark:hover:bg-neutral-900 dark:border-neutral-800 transition"
-                  >
-                    <div className="h-8 w-8 rounded-full bg-orange-600 text-white flex items-center justify-center font-bold text-xs">R</div>
-                    <div>
-                      <p className="text-xs font-bold text-neutral-800 dark:text-neutral-200">Ravi Kumar</p>
-                      <p className="text-[10px] text-neutral-400">ravikumar870317@gmail.com</p>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => selectGoogleAccountSim('Amit Patel', 'amit@tadkaclub.com')}
-                    className="w-full flex items-center gap-3 p-2 rounded-xl bg-white hover:bg-neutral-100 text-left border border-neutral-100 dark:bg-neutral-950 dark:hover:bg-neutral-900 dark:border-neutral-800 transition"
-                  >
-                    <div className="h-8 w-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs">A</div>
-                    <div>
-                      <p className="text-xs font-bold text-neutral-800 dark:text-neutral-200">Amit Patel</p>
-                      <p className="text-[10px] text-neutral-400">amit@tadkaclub.com</p>
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => selectGoogleAccountSim('Guest Chef', 'guest.chef@gmail.com')}
-                    className="w-full flex items-center gap-3 p-2 rounded-xl bg-white hover:bg-neutral-100 text-left border border-neutral-100 dark:bg-neutral-950 dark:hover:bg-neutral-900 dark:border-neutral-800 transition"
-                  >
-                    <div className="h-8 w-8 rounded-full bg-neutral-600 text-white flex items-center justify-center font-bold text-xs">G</div>
-                    <div>
-                      <p className="text-xs font-bold text-neutral-800 dark:text-neutral-200">New Guest Chef</p>
-                      <p className="text-[10px] text-neutral-400">guest.chef@gmail.com</p>
-                    </div>
-                  </button>
-                </div>
-              </div>
-            )}
 
             <div className="text-center mt-6 pt-6 border-t border-neutral-100 dark:border-neutral-900 text-xs text-neutral-400">
               New to the club?{' '}
