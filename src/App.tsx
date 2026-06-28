@@ -37,6 +37,7 @@ import FinanceCalculator from './components/FinanceCalculator';
 import EcommerceTab from './components/EcommerceTab';
 import AdminPanel from './components/AdminPanel';
 import UserDashboard from './components/UserDashboard';
+import AuthPages from './components/AuthPages';
 import { AboutUs, ContactUs, PrivacyPolicy, TermsConditions, Disclaimer } from './components/LegalPages';
 
 export default function App() {
@@ -151,22 +152,31 @@ export default function App() {
 
   // Modal display states
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [modalAuthView, setModalAuthView] = useState<'login' | 'signup' | 'forgot-password'>('login');
   const [showNewsletterModal, setShowNewsletterModal] = useState(false);
   const [newsletterInputEmail, setNewsletterInputEmail] = useState('');
   const [newsletterSuccess, setNewsletterSuccess] = useState(false);
 
   // Authenticated state (Preloaded user Ravi based on system specs!)
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
+    const hasVisited = localStorage.getItem('tadka_has_visited_v1');
+    if (!hasVisited) {
+      localStorage.setItem('tadka_has_visited_v1', 'true');
+      localStorage.setItem('tadka_is_logged_in', 'true');
+      localStorage.setItem('tadka_username', 'Ravi Kumar');
+      localStorage.setItem('tadka_login_email', 'ravikumar870317@gmail.com');
+      return true;
+    }
     const saved = localStorage.getItem('tadka_is_logged_in');
-    return saved !== null ? saved === 'true' : true;
+    return saved === 'true';
   });
   const [username, setUsername] = useState<string>(() => {
     const saved = localStorage.getItem('tadka_username');
-    return saved !== null ? saved : 'Ravi Kumar';
+    return saved !== null ? saved : '';
   });
   const [loginEmail, setLoginEmail] = useState<string>(() => {
     const saved = localStorage.getItem('tadka_login_email');
-    return saved !== null ? saved : 'ravikumar870317@gmail.com';
+    return saved !== null ? saved : '';
   });
   const [loginPassword, setLoginPassword] = useState('');
 
@@ -250,43 +260,75 @@ export default function App() {
     localStorage.setItem('tadka_reading_history', JSON.stringify(readingHistory));
   }, [readingHistory]);
 
+  // Synchronize hash/route paths with active view category
+  useEffect(() => {
+    const handleLocationChange = () => {
+      const hash = window.location.hash || window.location.pathname;
+      if (hash.includes('login')) {
+        setActiveCategory('login');
+        setActiveArticle(null);
+      } else if (hash.includes('signup')) {
+        setActiveCategory('signup');
+        setActiveArticle(null);
+      } else if (hash.includes('forgot-password')) {
+        setActiveCategory('forgot-password');
+        setActiveArticle(null);
+      } else if (hash.includes('profile')) {
+        setActiveCategory('dashboard');
+        setActiveArticle(null);
+      }
+    };
+    handleLocationChange();
+    window.addEventListener('hashchange', handleLocationChange);
+    window.addEventListener('popstate', handleLocationChange);
+    return () => {
+      window.removeEventListener('hashchange', handleLocationChange);
+      window.removeEventListener('popstate', handleLocationChange);
+    };
+  }, []);
+
   const handleAddQuiz = (newQuiz: Quiz) => {
     setQuizzes((prev) => [newQuiz, ...prev]);
   };
 
   // Auth Handlers
-  const handleLoginSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!loginEmail.trim() || !loginPassword.trim()) {
-      alert('Please fill out all credentials.');
-      return;
-    }
-    const existingUser = users.find(u => u.email.toLowerCase() === loginEmail.toLowerCase());
-    if (existingUser) {
-      setUsername(existingUser.name);
-      setUserTier(existingUser.tier);
-      setUserPoints(existingUser.points);
-      setIsLoggedIn(true);
-      setShowLoginModal(false);
-      alert(`Welcome back to Tadka Club, ${existingUser.name}!`);
-    } else {
-      const extractedUser = loginEmail.split('@')[0];
-      const beautifulName = extractedUser.charAt(0).toUpperCase() + extractedUser.slice(1);
-      setUsername(beautifulName);
-      setUserTier('Free');
-      setUserPoints(100);
-      setIsLoggedIn(true);
-      setShowLoginModal(false);
-      alert(`Welcome back to Tadka Club, ${beautifulName}!`);
-    }
+  const handleAddUser = (newUser: UserAccount) => {
+    setUsers(prev => [...prev, newUser]);
+  };
+
+  const handleUpdateUserPassword = (emailVal: string, newPasswordHash: string) => {
+    setUsers(prev => prev.map(u => {
+      if (u.email.toLowerCase() === emailVal.toLowerCase()) {
+        return { ...u, passwordHash: newPasswordHash };
+      }
+      return u;
+    }));
+  };
+
+  const handleLoginSuccess = (emailVal: string, nameVal: string, tierVal: 'Free' | 'Premium', pointsVal: number) => {
+    setLoginEmail(emailVal);
+    setUsername(nameVal);
+    setUserTier(tierVal);
+    setUserPoints(pointsVal);
+    setIsLoggedIn(true);
+    setShowLoginModal(false);
+    setActiveCategory('all'); // Go to feed after login
+    window.location.hash = ''; // Clear hash route
+    alert(`Welcome back to Tadka Club, ${nameVal}!`);
   };
 
   const handleLogout = () => {
     setIsLoggedIn(false);
     setUsername('');
+    setLoginEmail('');
     setUserTier('Free');
     setActiveCategory('all');
     setActiveArticle(null);
+    window.location.hash = '';
+    // Clear in localStorage explicitly so it stays logged out on refresh
+    localStorage.setItem('tadka_is_logged_in', 'false');
+    localStorage.setItem('tadka_username', '');
+    localStorage.setItem('tadka_login_email', '');
     alert('Logged out successfully.');
   };
 
@@ -645,6 +687,25 @@ export default function App() {
                 />
               )}
 
+              {/* AUTH PAGES (LOGIN, SIGNUP, FORGOT PASSWORD) */}
+              {(activeCategory === 'login' || activeCategory === 'signup' || activeCategory === 'forgot-password') && (
+                <AuthPages
+                  view={activeCategory as 'login' | 'signup' | 'forgot-password'}
+                  onViewChange={(newView) => {
+                    setActiveCategory(newView);
+                    window.location.hash = newView;
+                  }}
+                  users={users}
+                  onAddUser={handleAddUser}
+                  onLoginSuccess={handleLoginSuccess}
+                  onUpdateUserPassword={handleUpdateUserPassword}
+                  onBackToHome={() => {
+                    setActiveCategory('all');
+                    window.location.hash = '';
+                  }}
+                />
+              )}
+
               {/* ABOUT US TAB */}
               {activeCategory === 'about' && (
                 <AboutUs 
@@ -905,55 +966,24 @@ export default function App() {
 
       {/* LOGIN MODAL OVERLAY */}
       {showLoginModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
-          <div className="relative w-full max-w-sm bg-white rounded-2xl border p-6 shadow-2xl dark:bg-neutral-950 dark:border-neutral-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in" id="login-modal-overlay">
+          <div className="relative w-full max-w-lg bg-white rounded-3xl border border-neutral-100 p-2 shadow-2xl dark:bg-neutral-950 dark:border-neutral-800">
             <button 
               onClick={() => setShowLoginModal(false)}
-              className="absolute top-4 right-4 p-1 rounded-full text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-900"
+              className="absolute top-6 right-6 z-10 p-1.5 rounded-full text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 dark:hover:bg-neutral-900"
             >
               <X className="h-5 w-5" />
             </button>
 
-            <form onSubmit={handleLoginSubmit}>
-              <div className="text-center mb-6">
-                <span className="bg-orange-500/15 text-orange-600 text-[10px] font-extrabold px-3 py-1 rounded-full uppercase dark:bg-orange-950/40">Tadka Club Members</span>
-                <h3 className="text-lg font-black text-neutral-900 dark:text-white mt-2">Join Our Free Club</h3>
-                <p className="text-xs text-neutral-400 mt-1">Unlock comments, reactions, and daily reward point trackers.</p>
-              </div>
-
-              <div className="space-y-4 mb-6">
-                <div>
-                  <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block mb-1">Email Address</label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="e.g., ravi@example.com"
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    className="w-full rounded-md border border-neutral-200 bg-neutral-50 py-2.5 px-3.5 text-xs font-bold outline-none focus:border-orange-500 focus:bg-white dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider block mb-1">Password</label>
-                  <input
-                    type="password"
-                    required
-                    placeholder="••••••••"
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    className="w-full rounded-md border border-neutral-200 bg-neutral-50 py-2.5 px-3.5 text-xs font-bold outline-none focus:border-orange-500 focus:bg-white dark:border-neutral-800 dark:bg-neutral-900 dark:text-white"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full rounded-md bg-orange-600 py-3 text-xs font-extrabold text-white hover:bg-orange-700 transition shadow-md shadow-orange-500/10 text-center"
-              >
-                Sign In / Join Now
-              </button>
-            </form>
+            <AuthPages
+              view={modalAuthView}
+              onViewChange={setModalAuthView}
+              users={users}
+              onAddUser={handleAddUser}
+              onLoginSuccess={handleLoginSuccess}
+              onUpdateUserPassword={handleUpdateUserPassword}
+              onBackToHome={() => setShowLoginModal(false)}
+            />
           </div>
         </div>
       )}
